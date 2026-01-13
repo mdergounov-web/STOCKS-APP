@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>STOCKS – Marché</title>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: #fff;
+    text-align: center;
+  }
+
+  h1 {
+    margin-top: 20px;
+  }
+
+  button, select {
+    padding: 10px 15px;
+    font-size: 16px;
+    margin: 10px;
+  }
+
+  #timer {
+    font-size: 28px;
+    margin: 20px;
+    color: #00ffcc;
+  }
+
+  #zoneDes {
+    margin: 20px auto;
+    padding: 20px;
+    border: 2px solid #444;
+    width: 420px;
+    min-height: 180px;
+  }
+
+  .dice {
+    font-size: 60px;
+    display: inline-block;
+    margin: 0 20px;
+    animation: shake 0.4s infinite;
+  }
+
+  @keyframes shake {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(10deg); }
+    50% { transform: rotate(-10deg); }
+    75% { transform: rotate(10deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  table {
+    margin: 30px auto;
+    border-collapse: collapse;
+    background: #222;
+  }
+
+  th, td {
+    border: 1px solid #555;
+    padding: 8px 12px;
+  }
+
+  th {
+    background: #333;
+  }
+</style>
+</head>
+
+<body>
+
+<h1>STOCKS – Le Jeu de la Bourse</h1>
+
+<div>
+  ⏱️ Durée de la partie :
+  <select id="selectTemps">
+    <option value="20">20 minutes</option>
+    <option value="30" selected>30 minutes</option>
+    <option value="40">40 minutes</option>
+    <option value="-1">Illimité</option>
+  </select>
+</div>
+
+<div id="timer">⏱️ --:--</div>
+
+<button onclick="demarrerPartie()">▶️ Commencer la partie</button>
+<button onclick="clotureMarche()">📉 Clôture du marché</button>
+
+<div id="zoneDes">
+  <p>En attente de la clôture…</p>
+</div>
+
+<table id="tablePrix">
+  <tr>
+    <th>Action</th>
+    <th>Prix initial (€)</th>
+  </tr>
+</table>
+
+<script>
+/* ===============================
+   DONNÉES
+================================ */
+
+let tempsRestant = null;
+let timerInterval = null;
+let numeroCloture = 0;
+let partieDemarree = false;
+
+const prixActions = {
+  "POMME": 80,
+  "BOREAL": 72,
+  "LOUIS TUIVON": 60,
+  "D.E.F.": 55,
+  "FT1": 48,
+  "SUNGMAS": 40,
+  "LLATENU": 35,
+  "CARI NOPER": 28,
+  "TALTO": 20,
+  "SOTA": 15
+};
+
+/* ===============================
+   TABLEAU
+================================ */
+
+const table = document.getElementById("tablePrix");
+
+Object.keys(prixActions).forEach(action => {
+  const row = document.createElement("tr");
+  row.innerHTML = `<td>${action}</td><td>${prixActions[action]} €</td>`;
+  table.appendChild(row);
+});
+
+/* ===============================
+   DÉMARRAGE PARTIE
+================================ */
+
+function demarrerPartie() {
+  if (partieDemarree) return;
+
+  partieDemarree = true;
+
+  const valeur = document.getElementById("selectTemps").value;
+
+  if (valeur !== "-1") {
+    tempsRestant = parseInt(valeur) * 60;
+    timerInterval = setInterval(() => {
+      tempsRestant--;
+      const min = String(Math.floor(tempsRestant / 60)).padStart(2, "0");
+      const sec = String(tempsRestant % 60).padStart(2, "0");
+      document.getElementById("timer").textContent = `⏱️ ${min}:${sec}`;
+
+      if (tempsRestant <= 0) {
+        clearInterval(timerInterval);
+        alert("⏰ Temps écoulé – dernière clôture !");
+      }
+    }, 1000);
+  } else {
+    document.getElementById("timer").textContent = "⏱️ ∞";
+  }
+}
+
+/* ===============================
+   CLÔTURE DE MARCHÉ
+================================ */
+
+function clotureMarche() {
+  if (!partieDemarree) return;
+
+  numeroCloture++;
+
+  const th = document.createElement("th");
+  th.textContent = "Clôture " + numeroCloture;
+  table.rows[0].appendChild(th);
+
+  const actions = Object.keys(prixActions);
+  let index = 0;
+
+  function prochaineAction() {
+    if (index >= actions.length) {
+      document.getElementById("zoneDes").innerHTML = "<p>✅ Clôture terminée</p>";
+      return;
+    }
+
+    const action = actions[index];
+    lancerDes(action, () => {
+      const row = table.rows[index + 1];
+      const td = document.createElement("td");
+      td.textContent = prixActions[action] + " €";
+      row.appendChild(td);
+      index++;
+      prochaineAction();
+    });
+  }
+
+  prochaineAction();
+}
+
+/* ===============================
+   DÉS ANIMÉS (4s)
+================================ */
+
+function lancerDes(action, callback) {
+  const zone = document.getElementById("zoneDes");
+
+  zone.innerHTML = `
+    <h2>${action}</h2>
+    <div>
+      <span class="dice">🎲</span>
+      <span class="dice">🎲</span>
+    </div>
+    <p>Lancement des dés…</p>
+  `;
+
+  setTimeout(() => {
+    const vert = Math.floor(Math.random() * 6) + 1;
+    const rouge = Math.floor(Math.random() * 6) + 1;
+    const delta = vert - rouge;
+    const variation = delta * 0.1;
+
+    prixActions[action] = Math.max(
+      1,
+      Math.round(prixActions[action] * (1 + variation))
+    );
+
+    zone.innerHTML = `
+      <h2>${action}</h2>
+      <div style="font-size:50px">
+        🟢 ${vert} &nbsp; 🔴 ${rouge}
+      </div>
+      <p>Variation : ${delta >= 0 ? "+" : ""}${delta * 10}%</p>
+    `;
+  }, 2000);
+
+  setTimeout(callback, 4000);
+}
+</script>
+
+</body>
+</html>
