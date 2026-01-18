@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -65,6 +65,11 @@
   th {
     background: #333;
   }
+
+  /* Bouton passer caché par défaut */
+  #btnPasser {
+    display: none;
+  }
 </style>
 </head>
 
@@ -75,10 +80,10 @@
 <div>
   ⏱️ Durée de la partie :
   <select id="selectTemps">
-    <option value="20">20 minutes</option>
-    <option value="30" selected>30 minutes</option>
-    <option value="40">40 minutes</option>
-    <option value="-1">Illimité</option>
+    <option value="20">20 minutes (mode stress)</option>
+    <option value="30" selected>30 minutes (mode intermédiaire - recommandé)</option>
+    <option value="40">40 minutes (mode stratégie)</option>
+    <option value="-1">Illimité (mode personnalisé)</option>
   </select>
 </div>
 
@@ -86,6 +91,9 @@
 
 <button onclick="demarrerPartie()">▶️ Commencer la partie</button>
 <button onclick="clotureMarche()">📉 Clôture du marché</button>
+
+<!-- Nouveau bouton -->
+<button id="btnPasser" onclick="passerCinematique()">⏭️ Passer</button>
 
 <div id="zoneDes">
   <p>En attente de la clôture…</p>
@@ -107,6 +115,21 @@ let tempsRestant = null;
 let timerInterval = null;
 let numeroCloture = 0;
 let partieDemarree = false;
+
+/* Gestion du bouton "Passer" */
+let modePasser = false;            // une fois activé, skip sur toute la clôture en cours
+let animationActive = false;       // une animation de dés est en cours
+let animationResolve = null;       // fonction pour terminer instantanément l'action courante
+
+const btnPasser = document.getElementById("btnPasser");
+
+function afficherBoutonPasser() {
+  btnPasser.style.display = "inline-block";
+}
+
+function cacherBoutonPasser() {
+  btnPasser.style.display = "none";
+}
 
 const prixActions = {
   "POMME": 80,
@@ -169,6 +192,12 @@ function demarrerPartie() {
 function clotureMarche() {
   if (!partieDemarree) return;
 
+  // À chaque clôture, le mode passer repart à false
+  modePasser = false;
+
+  // Le bouton "Passer" apparaît uniquement pendant la clôture
+  afficherBoutonPasser();
+
   numeroCloture++;
 
   const th = document.createElement("th");
@@ -181,6 +210,10 @@ function clotureMarche() {
   function prochaineAction() {
     if (index >= actions.length) {
       document.getElementById("zoneDes").innerHTML = "<p>✅ Clôture terminée</p>";
+      cacherBoutonPasser();       // disparaît après la fin de clôture
+      modePasser = false;
+      animationActive = false;
+      animationResolve = null;
       return;
     }
 
@@ -199,11 +232,36 @@ function clotureMarche() {
 }
 
 /* ===============================
+   BOUTON PASSER
+================================ */
+
+function passerCinematique() {
+  // Active le mode "prix directs" pour le reste de la clôture en cours
+  modePasser = true;
+
+  // Si une animation est en cours, on la termine instantanément
+  if (animationActive && typeof animationResolve === "function") {
+    animationResolve();
+  }
+}
+
+/* ===============================
    DÉS ANIMÉS (4s)
 ================================ */
 
 function lancerDes(action, callback) {
   const zone = document.getElementById("zoneDes");
+
+  // Si le modePasser est déjà activé, on calcule directement sans cinématique
+  if (modePasser) {
+    const vert = Math.floor(Math.random() * 6) + 1;
+    const rouge = Math.floor(Math.random() * 6) + 1;
+    appliquerVariationEtAfficher(action, vert, rouge);
+    callback();
+    return;
+  }
+
+  animationActive = true;
 
   zone.innerHTML = `
     <h2>${action}</h2>
@@ -214,29 +272,67 @@ function lancerDes(action, callback) {
     <p>Lancement des dés…</p>
   `;
 
-  setTimeout(() => {
+  let resolu = false;
+  let t1 = null;
+  let t2 = null;
+
+  // Fonction qui termine l'action courante instantanément (appelée par "Passer")
+  animationResolve = () => {
+    if (resolu) return;
+    resolu = true;
+    animationActive = false;
+
+    if (t1) clearTimeout(t1);
+    if (t2) clearTimeout(t2);
+
     const vert = Math.floor(Math.random() * 6) + 1;
     const rouge = Math.floor(Math.random() * 6) + 1;
-    const delta = vert - rouge;
-    const variation = delta * 0.1;
+    appliquerVariationEtAfficher(action, vert, rouge);
 
-    prixActions[action] = Math.max(
-      1,
-      Math.round(prixActions[action] * (1 + variation))
-    );
+    // On enchaîne immédiatement
+    callback();
+  };
 
-    zone.innerHTML = `
-      <h2>${action}</h2>
-      <div style="font-size:50px">
-        🟢 ${vert} &nbsp; 🔴 ${rouge}
-      </div>
-      <p>Variation : ${delta >= 0 ? "+" : ""}${delta * 10}%</p>
-    `;
+  // Révélation normale à 2s
+  t1 = setTimeout(() => {
+    if (resolu) return;
+    const vert = Math.floor(Math.random() * 6) + 1;
+    const rouge = Math.floor(Math.random() * 6) + 1;
+    appliquerVariationEtAfficher(action, vert, rouge);
   }, 2000);
 
-  setTimeout(callback, 4000);
+  // Fin normale à 4s
+  t2 = setTimeout(() => {
+    if (resolu) return;
+    resolu = true;
+    animationActive = false;
+    animationResolve = null;
+    callback();
+  }, 4000);
+}
+
+function appliquerVariationEtAfficher(action, vert, rouge) {
+  const zone = document.getElementById("zoneDes");
+
+  const delta = vert - rouge;
+  const variation = delta * 0.1;
+
+  prixActions[action] = Math.max(
+    1,
+    Math.round(prixActions[action] * (1 + variation))
+  );
+
+  zone.innerHTML = `
+    <h2>${action}</h2>
+    <div style="font-size:50px">
+      🟢 ${vert} &nbsp; 🔴 ${rouge}
+    </div>
+    <p>Variation : ${delta >= 0 ? "+" : ""}${delta * 10}%</p>
+    <p><strong>Nouveau prix :</strong> ${prixActions[action]} €</p>
+  `;
 }
 </script>
 
 </body>
 </html>
+
