@@ -1,336 +1,365 @@
-<!DOCTYPE html> 
+<!doctype html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>STOCKS – Marché</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>STOCKS – Marché</title>
 
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #111;
-    color: #fff;
-    text-align: center;
-  }
+  <style>
+    :root{
+      --bg:#111;
+      --panel:#1b1b1b;
+      --text:#fff;
+      --muted:#9aa0a6;
+      --accent:#00ffcc;
+      --border:#444;
+      --table:#222;
+      --tableHead:#333;
+    }
 
-  h1 {
-    margin-top: 20px;
-  }
+    body{
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
 
-  button, select {
-    padding: 10px 15px;
-    font-size: 16px;
-    margin: 10px;
-  }
+    h1{ margin: 20px 0 10px; }
 
-  #timer {
-    font-size: 28px;
-    margin: 20px;
-    color: #00ffcc;
-  }
+    button, select{
+      padding: 10px 15px;
+      font-size: 16px;
+      margin: 10px;
+    }
 
-  #zoneDes {
-    margin: 20px auto;
-    padding: 20px;
-    border: 2px solid #444;
-    width: 420px;
-    min-height: 180px;
-  }
+    #timer{
+      font-size: 28px;
+      margin: 20px;
+      color: var(--accent);
+    }
 
-  .dice {
-    font-size: 60px;
-    display: inline-block;
-    margin: 0 20px;
-    animation: shake 0.4s infinite;
-  }
+    #marketBox{
+      margin: 20px auto;
+      padding: 20px;
+      border: 2px solid var(--border);
+      width: 420px;
+      min-height: 180px;
+      background: rgba(255,255,255,0.02);
+    }
 
-  @keyframes shake {
-    0% { transform: rotate(0deg); }
-    25% { transform: rotate(10deg); }
-    50% { transform: rotate(-10deg); }
-    75% { transform: rotate(10deg); }
-    100% { transform: rotate(0deg); }
-  }
+    .dice{
+      font-size: 60px;
+      display: inline-block;
+      margin: 0 20px;
+      animation: shake 0.4s infinite;
+    }
 
-  table {
-    margin: 30px auto;
-    border-collapse: collapse;
-    background: #222;
-  }
+    @keyframes shake{
+      0%{ transform: rotate(0deg); }
+      25%{ transform: rotate(10deg); }
+      50%{ transform: rotate(-10deg); }
+      75%{ transform: rotate(10deg); }
+      100%{ transform: rotate(0deg); }
+    }
 
-  th, td {
-    border: 1px solid #555;
-    padding: 8px 12px;
-  }
+    table{
+      margin: 30px auto;
+      border-collapse: collapse;
+      background: var(--table);
+    }
 
-  th {
-    background: #333;
-  }
+    th, td{
+      border: 1px solid #555;
+      padding: 8px 12px;
+    }
 
-  /* Bouton passer caché par défaut */
-  #btnPasser {
-    display: none;
-  }
-</style>
+    th{ background: var(--tableHead); }
+
+    #skipBtn{ display:none; }
+    .hint{ color: var(--muted); font-size: 13px; margin-top: 4px; }
+  </style>
 </head>
 
 <body>
+  <h1>STOCKS – Le Jeu de la Bourse</h1>
 
-<h1>STOCKS – Le Jeu de la Bourse</h1>
+  <div>
+    ⏱️ Durée de la partie :
+    <select id="durationSelect">
+      <option value="20">20 minutes (mode stress)</option>
+      <option value="30" selected>30 minutes (recommandé)</option>
+      <option value="40">40 minutes (mode stratégie)</option>
+      <option value="-1">Illimité (personnalisé)</option>
+    </select>
+    <div class="hint">Le chrono démarre quand tu cliques sur “Commencer la partie”.</div>
+  </div>
 
-<div>
-  ⏱️ Durée de la partie :
-  <select id="selectTemps">
-    <option value="20">20 minutes (mode stress)</option>
-    <option value="30" selected>30 minutes (mode intermédiaire - recommandé)</option>
-    <option value="40">40 minutes (mode stratégie)</option>
-    <option value="-1">Illimité (mode personnalisé)</option>
-  </select>
-</div>
+  <div id="timer">⏱️ --:--</div>
 
-<div id="timer">⏱️ --:--</div>
+  <button id="startBtn">▶️ Commencer la partie</button>
+  <button id="closeBtn">📉 Clôture du marché</button>
+  <button id="skipBtn">⏭️ Passer</button>
 
-<button onclick="demarrerPartie()">▶️ Commencer la partie</button>
-<button onclick="clotureMarche()">📉 Clôture du marché</button>
+  <div id="marketBox">
+    <p class="hint">En attente de la clôture…</p>
+  </div>
 
-<!-- Nouveau bouton -->
-<button id="btnPasser" onclick="passerCinematique()">⏭️ Passer</button>
-
-<div id="zoneDes">
-  <p>En attente de la clôture…</p>
-</div>
-
-<table id="tablePrix">
-  <tr>
-    <th>Action</th>
-    <th>Prix initial (€)</th>
-  </tr>
-</table>
+  <table id="priceTable">
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th>Prix initial (€)</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
 
 <script>
-/* ===============================
-   DONNÉES
-================================ */
+(() => {
+  /* ==========================
+     Données
+  ========================== */
+  const PRICES = {
+    "POMME": 80,
+    "BOREAL": 72,
+    "LOUIS TUIVON": 60,
+    "D.E.F.": 55,
+    "FT1": 48,
+    "SUNGMAS": 40,
+    "LLATENU": 35,
+    "CARI NOPER": 28,
+    "TALTO": 20,
+    "SOTA": 15
+  };
 
-let tempsRestant = null;
-let timerInterval = null;
-let numeroCloture = 0;
-let partieDemarree = false;
+  /* ==========================
+     DOM
+  ========================== */
+  const els = {
+    duration: document.getElementById("durationSelect"),
+    timer: document.getElementById("timer"),
+    start: document.getElementById("startBtn"),
+    close: document.getElementById("closeBtn"),
+    skip: document.getElementById("skipBtn"),
+    box: document.getElementById("marketBox"),
+    table: document.getElementById("priceTable"),
+    tbody: document.querySelector("#priceTable tbody"),
+    theadRow: document.querySelector("#priceTable thead tr"),
+  };
 
-/* Gestion du bouton "Passer" */
-let modePasser = false;            // une fois activé, skip sur toute la clôture en cours
-let animationActive = false;       // une animation de dés est en cours
-let animationResolve = null;       // fonction pour terminer instantanément l'action courante
+  /* ==========================
+     État
+  ========================== */
+  let gameStarted = false;
+  let timeLeftSec = null;
+  let clockId = null;
 
-const btnPasser = document.getElementById("btnPasser");
+  let closeIndex = 0;
+  let closeNumber = 0;
 
-function afficherBoutonPasser() {
-  btnPasser.style.display = "inline-block";
-}
+  // gestion "Passer"
+  let skipMode = false;              // si activé, on calcule sans cinématique
+  let animRunning = false;           // animation en cours
+  let forceResolve = null;           // fonction pour terminer l'action courante
 
-function cacherBoutonPasser() {
-  btnPasser.style.display = "none";
-}
+  const ACTIONS = Object.keys(PRICES);
 
-const prixActions = {
-  "POMME": 80,
-  "BOREAL": 72,
-  "LOUIS TUIVON": 60,
-  "D.E.F.": 55,
-  "FT1": 48,
-  "SUNGMAS": 40,
-  "LLATENU": 35,
-  "CARI NOPER": 28,
-  "TALTO": 20,
-  "SOTA": 15
-};
-
-/* ===============================
-   TABLEAU
-================================ */
-
-const table = document.getElementById("tablePrix");
-
-Object.keys(prixActions).forEach(action => {
-  const row = document.createElement("tr");
-  row.innerHTML = `<td>${action}</td><td>${prixActions[action]} €</td>`;
-  table.appendChild(row);
-});
-
-/* ===============================
-   DÉMARRAGE PARTIE
-================================ */
-
-function demarrerPartie() {
-  if (partieDemarree) return;
-
-  partieDemarree = true;
-
-  const valeur = document.getElementById("selectTemps").value;
-
-  if (valeur !== "-1") {
-    tempsRestant = parseInt(valeur) * 60;
-    timerInterval = setInterval(() => {
-      tempsRestant--;
-      const min = String(Math.floor(tempsRestant / 60)).padStart(2, "0");
-      const sec = String(tempsRestant % 60).padStart(2, "0");
-      document.getElementById("timer").textContent = `⏱️ ${min}:${sec}`;
-
-      if (tempsRestant <= 0) {
-        clearInterval(timerInterval);
-        alert("⏰ Temps écoulé – dernière clôture !");
-      }
-    }, 1000);
-  } else {
-    document.getElementById("timer").textContent = "⏱️ ∞";
+  /* ==========================
+     UI helpers
+  ========================== */
+  function showSkip(show){
+    els.skip.style.display = show ? "inline-block" : "none";
   }
-}
 
-/* ===============================
-   CLÔTURE DE MARCHÉ
-================================ */
+  function renderBox(html){
+    els.box.innerHTML = html;
+  }
 
-function clotureMarche() {
-  if (!partieDemarree) return;
+  function formatMMSS(total){
+    const m = String(Math.floor(total / 60)).padStart(2, "0");
+    const s = String(total % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
 
-  // À chaque clôture, le mode passer repart à false
-  modePasser = false;
+  function rollDie(){
+    return Math.floor(Math.random() * 6) + 1;
+  }
 
-  // Le bouton "Passer" apparaît uniquement pendant la clôture
-  afficherBoutonPasser();
-
-  numeroCloture++;
-
-  const th = document.createElement("th");
-  th.textContent = "Clôture " + numeroCloture;
-  table.rows[0].appendChild(th);
-
-  const actions = Object.keys(prixActions);
-  let index = 0;
-
-  function prochaineAction() {
-    if (index >= actions.length) {
-      document.getElementById("zoneDes").innerHTML = "<p>✅ Clôture terminée</p>";
-      cacherBoutonPasser();       // disparaît après la fin de clôture
-      modePasser = false;
-      animationActive = false;
-      animationResolve = null;
-      return;
-    }
-
-    const action = actions[index];
-    lancerDes(action, () => {
-      const row = table.rows[index + 1];
-      const td = document.createElement("td");
-      td.textContent = prixActions[action] + " €";
-      row.appendChild(td);
-      index++;
-      prochaineAction();
+  /* ==========================
+     Table
+  ========================== */
+  function initTable(){
+    els.tbody.innerHTML = "";
+    ACTIONS.forEach(name => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${name}</td><td>${PRICES[name]} €</td>`;
+      els.tbody.appendChild(tr);
     });
   }
 
-  prochaineAction();
-}
-
-/* ===============================
-   BOUTON PASSER
-================================ */
-
-function passerCinematique() {
-  // Active le mode "prix directs" pour le reste de la clôture en cours
-  modePasser = true;
-
-  // Si une animation est en cours, on la termine instantanément
-  if (animationActive && typeof animationResolve === "function") {
-    animationResolve();
-  }
-}
-
-/* ===============================
-   DÉS ANIMÉS (4s)
-================================ */
-
-function lancerDes(action, callback) {
-  const zone = document.getElementById("zoneDes");
-
-  // Si le modePasser est déjà activé, on calcule directement sans cinématique
-  if (modePasser) {
-    const vert = Math.floor(Math.random() * 6) + 1;
-    const rouge = Math.floor(Math.random() * 6) + 1;
-    appliquerVariationEtAfficher(action, vert, rouge);
-    callback();
-    return;
+  function addCloseColumn(){
+    closeNumber += 1;
+    const th = document.createElement("th");
+    th.textContent = `Clôture ${closeNumber}`;
+    els.theadRow.appendChild(th);
   }
 
-  animationActive = true;
+  function appendPriceToRow(rowIndex, value){
+    const tr = els.tbody.rows[rowIndex];
+    const td = document.createElement("td");
+    td.textContent = `${value} €`;
+    tr.appendChild(td);
+  }
 
-  zone.innerHTML = `
-    <h2>${action}</h2>
-    <div>
-      <span class="dice">🎲</span>
-      <span class="dice">🎲</span>
-    </div>
-    <p>Lancement des dés…</p>
-  `;
+  /* ==========================
+     Chrono
+  ========================== */
+  function startGame(){
+    if (gameStarted) return;
+    gameStarted = true;
 
-  let resolu = false;
-  let t1 = null;
-  let t2 = null;
+    const minutes = parseInt(els.duration.value, 10);
 
-  // Fonction qui termine l'action courante instantanément (appelée par "Passer")
-  animationResolve = () => {
-    if (resolu) return;
-    resolu = true;
-    animationActive = false;
+    if (minutes === -1){
+      els.timer.textContent = "⏱️ ∞";
+      return;
+    }
 
-    if (t1) clearTimeout(t1);
-    if (t2) clearTimeout(t2);
+    timeLeftSec = minutes * 60;
+    els.timer.textContent = `⏱️ ${formatMMSS(timeLeftSec)}`;
 
-    const vert = Math.floor(Math.random() * 6) + 1;
-    const rouge = Math.floor(Math.random() * 6) + 1;
-    appliquerVariationEtAfficher(action, vert, rouge);
+    clockId = setInterval(() => {
+      timeLeftSec -= 1;
+      if (timeLeftSec <= 0){
+        clearInterval(clockId);
+        clockId = null;
+        timeLeftSec = 0;
+        els.timer.textContent = "⏱️ 00:00";
+        alert("⏰ Temps écoulé – dernière clôture !");
+        return;
+      }
+      els.timer.textContent = `⏱️ ${formatMMSS(timeLeftSec)}`;
+    }, 1000);
+  }
 
-    // On enchaîne immédiatement
-    callback();
-  };
+  /* ==========================
+     Clôture
+  ========================== */
+  function startClose(){
+    if (!gameStarted) return;
 
-  // Révélation normale à 2s
-  t1 = setTimeout(() => {
-    if (resolu) return;
-    const vert = Math.floor(Math.random() * 6) + 1;
-    const rouge = Math.floor(Math.random() * 6) + 1;
-    appliquerVariationEtAfficher(action, vert, rouge);
-  }, 2000);
+    skipMode = false;
+    closeIndex = 0;
+    showSkip(true);
+    addCloseColumn();
 
-  // Fin normale à 4s
-  t2 = setTimeout(() => {
-    if (resolu) return;
-    resolu = true;
-    animationActive = false;
-    animationResolve = null;
-    callback();
-  }, 4000);
-}
+    nextAction();
+  }
 
-function appliquerVariationEtAfficher(action, vert, rouge) {
-  const zone = document.getElementById("zoneDes");
+  function nextAction(){
+    if (closeIndex >= ACTIONS.length){
+      renderBox("<p>✅ Clôture terminée</p>");
+      showSkip(false);
+      animRunning = false;
+      forceResolve = null;
+      return;
+    }
 
-  const delta = vert - rouge;
-  const variation = delta * 0.1;
+    const actionName = ACTIONS[closeIndex];
+    handleActionClose(actionName, () => {
+      appendPriceToRow(closeIndex, PRICES[actionName]);
+      closeIndex += 1;
+      nextAction();
+    });
+  }
 
-  prixActions[action] = Math.max(
-    1,
-    Math.round(prixActions[action] * (1 + variation))
-  );
+  function handleActionClose(actionName, done){
+    if (skipMode){
+      const g = rollDie();
+      const r = rollDie();
+      applyAndDisplay(actionName, g, r);
+      done();
+      return;
+    }
 
-  zone.innerHTML = `
-    <h2>${action}</h2>
-    <div style="font-size:50px">
-      🟢 ${vert} &nbsp; 🔴 ${rouge}
-    </div>
-    <p>Variation : ${delta >= 0 ? "+" : ""}${delta * 10}%</p>
-    <p><strong>Nouveau prix :</strong> ${prixActions[action]} €</p>
-  `;
-}
+    animRunning = true;
+    renderBox(`
+      <h2>${actionName}</h2>
+      <div>
+        <span class="dice">🎲</span>
+        <span class="dice">🎲</span>
+      </div>
+      <p>Lancement des dés…</p>
+    `);
+
+    let resolved = false;
+    let tReveal = null;
+    let tFinish = null;
+
+    forceResolve = () => {
+      if (resolved) return;
+      resolved = true;
+      animRunning = false;
+
+      if (tReveal) clearTimeout(tReveal);
+      if (tFinish) clearTimeout(tFinish);
+
+      const g = rollDie();
+      const r = rollDie();
+      applyAndDisplay(actionName, g, r);
+      forceResolve = null;
+      done();
+    };
+
+    tReveal = setTimeout(() => {
+      if (resolved) return;
+      const g = rollDie();
+      const r = rollDie();
+      applyAndDisplay(actionName, g, r);
+    }, 2000);
+
+    tFinish = setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
+      animRunning = false;
+      forceResolve = null;
+      done();
+    }, 4000);
+  }
+
+  function applyAndDisplay(actionName, green, red){
+    const delta = green - red;
+    const variation = delta * 0.1;
+
+    PRICES[actionName] = Math.max(1, Math.round(PRICES[actionName] * (1 + variation)));
+
+    renderBox(`
+      <h2>${actionName}</h2>
+      <div style="font-size:50px">🟢 ${green} &nbsp; 🔴 ${red}</div>
+      <p>Variation : ${delta >= 0 ? "+" : ""}${delta * 10}%</p>
+      <p><strong>Nouveau prix :</strong> ${PRICES[actionName]} €</p>
+    `);
+  }
+
+  function skipCinematic(){
+    skipMode = true;
+    if (animRunning && typeof forceResolve === "function"){
+      forceResolve();
+    }
+  }
+
+  /* ==========================
+     Events
+  ========================== */
+  els.start.addEventListener("click", startGame);
+  els.close.addEventListener("click", startClose);
+  els.skip.addEventListener("click", skipCinematic);
+
+  /* init */
+  initTable();
+})();
 </script>
 
 </body>
